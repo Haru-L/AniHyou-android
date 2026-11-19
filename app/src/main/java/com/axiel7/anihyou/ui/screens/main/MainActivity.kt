@@ -65,6 +65,7 @@ import com.axiel7.anihyou.core.ui.theme.AniHyouTheme
 import com.axiel7.anihyou.ui.screens.main.composables.MainBottomNavBar
 import com.axiel7.anihyou.ui.screens.main.composables.MainNavigationRail
 import com.axiel7.anihyou.widget.AiringWidgetReceiver
+import com.axiel7.anihyou.widget.AnimeBehindWidgetReceiver
 import com.materialkolor.PaletteStyle
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -217,12 +218,15 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             try {
                 val manager = GlanceAppWidgetManager(this@MainActivity)
-                val result = manager.setWidgetPreviews(
-                    AiringWidgetReceiver::class,
-                    intSetOf(WIDGET_CATEGORY_HOME_SCREEN)
-                )
-                if (result == SET_WIDGET_PREVIEWS_RESULT_RATE_LIMITED) {
-                    Log.w("Widget", "Widget preview update rate limited")
+                val receivers = listOf(AiringWidgetReceiver::class, AnimeBehindWidgetReceiver::class)
+                for (receiver in receivers) {
+                    val result = manager.setWidgetPreviews(
+                        receiver,
+                        intSetOf(WIDGET_CATEGORY_HOME_SCREEN)
+                    )
+                    if (result == SET_WIDGET_PREVIEWS_RESULT_RATE_LIMITED) {
+                        Log.w("Widget", "Widget preview update rate limited for ${receiver.simpleName}")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("Widget", "Failed to set widget previews", e)

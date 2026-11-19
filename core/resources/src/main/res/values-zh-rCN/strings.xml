@@ -600,6 +600,8 @@
     <string name="list_name">列表名称</string>
     <string name="link_name">链接名称</string>
     <string name="anime_behind">未观看剧集</string>
+    <string name="widget_preview_five_episodes_behind">剩余 5 集</string>
+    <string name="widget_preview_two_episodes_behind">剩余 2 集</string>
     <string name="default_tab">默认标签页</string>
     <string name="last_used">最后一次使用</string>
     <string name="male">男</string>

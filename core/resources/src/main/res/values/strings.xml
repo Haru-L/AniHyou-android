@@ -622,6 +622,8 @@
     <string name="list_name">List name</string>
     <string name="link_name">Link name</string>
     <string name="anime_behind">Anime Behind</string>
+    <string name="widget_preview_five_episodes_behind">5 episodes behind</string>
+    <string name="widget_preview_two_episodes_behind">2 episodes behind</string>
     <string name="default_tab">Default tab</string>
     <string name="last_used">Last used</string>
     <string name="male">Male</string>
