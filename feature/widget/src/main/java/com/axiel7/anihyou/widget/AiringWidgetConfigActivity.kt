@@ -57,21 +57,23 @@ class AiringWidgetConfigActivity : ComponentActivity() {
             return
         }
 
-        val isColoredState = mutableStateOf(true)
         lifecycleScope.launch {
-            getCurrentConfig(appWidgetId)[AiringWidget.IS_COLORED_KEY]?.let {
-                isColoredState.value = it
+            val isColored = try {
+                getCurrentConfig(appWidgetId)[AiringWidget.IS_COLORED_KEY] ?: true
+            } catch (_: IllegalArgumentException) {
+                setResult(RESULT_CANCELED)
+                finish()
+                return@launch
             }
-        }
 
-        setContent {
-            val isColored by remember { isColoredState }
-            Content(
-                isColored = isColored,
-                onClickSave = { isColored ->
-                    lifecycleScope.launch { saveConfig(appWidgetId, isColored) }
-                }
-            )
+            setContent {
+                Content(
+                    isColored = isColored,
+                    onClickSave = { isColored ->
+                        lifecycleScope.launch { saveConfig(appWidgetId, isColored) }
+                    }
+                )
+            }
         }
     }
 
@@ -81,7 +83,13 @@ class AiringWidgetConfigActivity : ComponentActivity() {
     }
 
     private suspend fun saveConfig(appWidgetId: Int, isColored: Boolean) {
-        val glanceId = GlanceAppWidgetManager(this).getGlanceIdBy(appWidgetId)
+        val glanceId = try {
+            GlanceAppWidgetManager(this).getGlanceIdBy(appWidgetId)
+        } catch (_: IllegalArgumentException) {
+            setResult(RESULT_CANCELED)
+            finish()
+            return
+        }
         updateAppWidgetState(this, PreferencesGlanceStateDefinition, glanceId) { prefs ->
             prefs.toMutablePreferences().apply {
                 this[AiringWidget.IS_COLORED_KEY] = isColored
