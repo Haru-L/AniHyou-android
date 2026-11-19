@@ -17,6 +17,7 @@ import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.action.Action
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.CircularProgressIndicator
 import androidx.glance.appwidget.GlanceAppWidget
@@ -28,7 +29,6 @@ import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.itemsIndexed
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
-import androidx.glance.color.ColorProvider
 import androidx.glance.color.DynamicThemeColorProviders
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
@@ -48,7 +48,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
-import com.axiel7.anihyou.core.base.APP_PACKAGE_NAME
 import com.axiel7.anihyou.core.base.DataResult
 import com.axiel7.anihyou.core.base.UNKNOWN_CHAR
 import com.axiel7.anihyou.core.common.utils.DateUtils.timestampToDateString
@@ -61,13 +60,9 @@ import com.axiel7.anihyou.core.network.AiringWidgetQuery
 import com.axiel7.anihyou.core.network.NetworkVariables
 import com.axiel7.anihyou.core.resources.ColorUtils.colorFromHex
 import com.axiel7.anihyou.core.resources.R
-import com.materialkolor.ktx.darken
-import com.materialkolor.ktx.from
-import com.materialkolor.ktx.harmonize
-import com.materialkolor.ktx.toneColor
-import com.materialkolor.palettes.TonalPalette
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -82,7 +77,9 @@ class AiringWidget : GlanceAppWidget(), KoinComponent {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         networkVariables.accessToken = defaultPreferencesRepository.accessToken.first()
 
-        val result = mediaRepository.getAiringWidgetData(page = 1, perPage = 50)
+        val result = withTimeoutOrNull(WIDGET_LOAD_TIMEOUT_MS) {
+            mediaRepository.getAiringWidgetData(page = 1, perPage = 50)
+        } ?: DataResult.Error(context.getString(R.string.widget_load_timeout))
         provideContent {
             val scope = rememberCoroutineScope()
             val prefs = currentState<Preferences>()
@@ -101,8 +98,9 @@ class AiringWidget : GlanceAppWidget(), KoinComponent {
     override suspend fun providePreview(context: Context, widgetCategory: Int) {
         networkVariables.accessToken = defaultPreferencesRepository.accessToken.first()
 
-        val result = mediaRepository.getAiringWidgetData(page = 1, perPage = 50)
-            .takeIf { it is DataResult.Success }
+        val result = withTimeoutOrNull(WIDGET_LOAD_TIMEOUT_MS) {
+            mediaRepository.getAiringWidgetData(page = 1, perPage = 50)
+        }?.takeIf { it is DataResult.Success }
             ?: DataResult.Success(
                 data = listOf(
                     exampleAiringWidgetEntry,
@@ -205,8 +203,8 @@ class AiringWidget : GlanceAppWidget(), KoinComponent {
                 modifier = GlanceModifier
                     .defaultWeight()
                     .padding(vertical = 10.dp)
-                    .clickable(
-                        onClick = LocalContext.current.openDeepLink(
+                    .clickableIfAvailable(
+                        LocalContext.current.openDeepLink(
                             DeepLink(type = DeepLink.Type.CALENDAR, id = "")
                         )
                     )
@@ -252,24 +250,9 @@ class AiringWidget : GlanceAppWidget(), KoinComponent {
             } else null
         }
 
-        val primaryColor = GlanceTheme.colors.primary.getColor(LocalContext.current)
-
-        val backgroundColor = if (baseMediaColor != null) {
-            ColorProvider(
-                day = baseMediaColor.harmonize(primaryColor).darken(2f),
-                night = baseMediaColor.harmonize(primaryColor).darken(2f)
-            )
-        } else {
-            GlanceTheme.colors.secondaryContainer
-        }
-        val defaultTextColor = GlanceTheme.colors.onSecondaryContainer
-
-        val textColor = remember(baseMediaColor, defaultTextColor) {
-            baseMediaColor?.let {
-                val tone = TonalPalette.from(it).toneColor(95)
-                ColorProvider(day = tone, night = tone)
-            } ?: defaultTextColor
-        }
+        val cardColors = rememberWidgetCardColors(baseMediaColor)
+        val backgroundColor = cardColors?.container ?: GlanceTheme.colors.secondaryContainer
+        val textColor = cardColors?.title ?: GlanceTheme.colors.onSecondaryContainer
 
         Row(
             modifier = GlanceModifier
@@ -344,8 +327,8 @@ class AiringWidget : GlanceAppWidget(), KoinComponent {
                 modifier = GlanceModifier
                     .defaultWeight()
                     .cornerRadius(12.dp)
-                    .clickable(
-                        onClick = LocalContext.current.openDeepLink(
+                    .clickableIfAvailable(
+                        LocalContext.current.openDeepLink(
                             DeepLink(
                                 type = DeepLink.Type.ANIME,
                                 id = item.id.toString()
@@ -388,17 +371,16 @@ class AiringWidget : GlanceAppWidget(), KoinComponent {
         }
     }
 
-    private fun Context.openDeepLink(deepLink: DeepLink) =
-        actionStartActivity(
-            packageManager.getLaunchIntentForPackage(APP_PACKAGE_NAME)?.apply {
-                action = deepLink.type.intentAction
-                putExtra("content_id", deepLink.id)
-                putExtra("widget", true)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                addCategory(deepLink.id)
-            } ?: Intent()
-        )
+    private fun Context.openDeepLink(deepLink: DeepLink): Action? =
+        packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
+            intent.action = deepLink.type.intentAction
+            intent.putExtra("content_id", deepLink.id)
+            intent.putExtra("widget", true)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            intent.addCategory(deepLink.id)
+            actionStartActivity(intent)
+        }
 
     @OptIn(ExperimentalGlancePreviewApi::class)
     @Preview(widthDp = 255, heightDp = 150)

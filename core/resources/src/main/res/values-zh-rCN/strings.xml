@@ -30,6 +30,7 @@
     <string name="next_season">下一季度</string>
     <string name="trending_manga">热门漫画</string>
     <string name="not_logged_text">请登录后使用该功能</string>
+    <string name="widget_load_timeout">加载超时</string>
     <string name="login">登录</string>
     <string name="current">正在进行</string>
     <string name="planning">计划中</string>
